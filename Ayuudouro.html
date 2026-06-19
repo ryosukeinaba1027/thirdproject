@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>制限区域内テスト（A誘導路等 横断ルール編）</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            margin: 0;
+            padding: 10px;
+        }
+        .quiz-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #004d99;
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #004d99;
+            padding-bottom: 8px;
+            font-size: 1.5em;
+        }
+        h2 {
+            color: #007bff;
+            border-bottom: 1px dashed #ccc;
+            padding-bottom: 5px;
+            margin-top: 20px;
+            font-size: 1.2em;
+        }
+        .question-card {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+        .question-text {
+            font-size: 1em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        .answer-option {
+            display: block;
+            margin-bottom: 8px;
+            padding: 12px;
+            border-radius: 6px;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            line-height: 1.4;
+        }
+        .answer-option input[type="radio"] {
+            margin-right: 8px;
+        }
+        .answer-option:hover:not(.answered) {
+            background-color: #e6f7ff;
+        }
+        .answer-option.answered {
+            cursor: default;
+        }
+        .answer-option.correct {
+            background-color: #d4edda;
+            border-color: #1e7e34;
+        }
+        .answer-option.incorrect {
+            background-color: #f8d7da;
+            border-color: #dc3545;
+        }
+        .rationale {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            line-height: 1.5;
+            font-weight: bold;
+        }
+        .rationale.correct {
+            background-color: #c3e6cb;
+            color: #155724;
+        }
+        .rationale.incorrect {
+            background-color: #f5c6cb;
+            color: #721c24;
+        }
+        .submit-btn, .save-btn {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1.1em;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: background-color 0.2s;
+            text-align: center;
+        }
+        .save-btn {
+            background-color: #28a745;
+        }
+        .save-btn:hover {
+            background-color: #1e7e34;
+        }
+        .submit-btn:hover:not(:disabled) {
+            background-color: #0056b3;
+        }
+        .submit-btn:disabled {
+            background-color: #aaa;
+            cursor: not-allowed;
+        }
+        #results {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 1.2em;
+            font-weight: bold;
+            padding: 20px;
+            border-radius: 8px;
+            background-color: #eaf3ff;
+            border: 1px solid #cce5ff;
+        }
+        .score-info {
+            font-size: 1.5em;
+            color: #28a745;
+        }
+        .hint-text {
+            margin-top: 10px;
+            font-style: italic;
+            color: #555;
+            padding: 8px;
+            border-left: 3px solid #ffc107;
+            background-color: #fffbebe6;
+        }
+        .analysis-detail {
+            text-align: left;
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #f4f4f4;
+        }
+        .radar-chart {
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 0.9em;
+            line-height: 1.6;
+            background-color: #fff;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            margin-top: 15px;
+        }
+        .radar-chart .low { color: #dc3545; font-weight: bold; }
+        .radar-chart .mid { color: #ffc107; font-weight: bold; }
+        .radar-chart .high { color: #28a745; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="quiz-container">
+        <h1>東京国際空港 制限区域内テスト</h1>
+        <form id="quiz-form">
+            <div id="quiz-content">
+                </div>
+            <button type="button" id="show-results-btn" class="submit-btn" disabled>結果を表示 (0/10 問解答)</button>
+        </form>
+        
+        <div id="results" style="display:none;">
+            </div>
+    </div>
+
+    <script>
+        // --- 起動時にLocalStorageの回答データを全てクリアする関数 ---
+        function forceClearLocalStorage() {
+            for (let i = 0; i < 10; i++) {
+                localStorage.removeItem(`q${i}`);
+            }
+        }
+        forceClearLocalStorage();
+
+        const quizData = {
+          "questions": [
+            {
+              "questionNumber": 1,
+              "question": "航空機走行区域（誘導路など）を横断・走行する際、管制塔への連絡や進行のルールとして正しいものはどれですか。",
+              "category": "無線交信・管制",
+              "imageUrl": null,
+              "answerOptions": [
+                { "text": "周囲を目視して航空機がいなければ、自身の判断で進行してよい", "rationale": "目視だけで判断し進入することは非常に危険であり禁止されています。", "isCorrect": false },
+                { "text": "元請け職員の指示を待たずに、各自で管制塔へ無線連絡を入れて進行する", "rationale": "無断進入を防ぐため、個人的な判断での無線連絡と進行は認められません。", "isCorrect": false },
+                { "text": "管制に連絡を入れるため、元請けの指示があった後に進行する", "rationale": "航空機走行区域等へ進入する場合は、管制塔と無線連絡を行う必要があります。無断での進入は重大な事故につながるため、必ず元請けの指示（または誘導）に従って進行しなければなりません。", "isCorrect": true },
+                { "text": "サービスレーンと同様に、一時停止のみで進行してよい", "rationale": "誘導路の横断等には必ず管制への連絡・許可が必要です。", "isCorrect": false }
+              ],
+              "hint": "誘導路などへの進入は、個人の判断で行うことはできません。"
+            },
+            {
+              "questionNumber": 2,
+              "question": "過去に制限区域内で実際に発生した「置き忘れ」の事故事例として、マニュアルに記載されているものはどれですか。",
+              "category": "FOD・遺失物防止",
+              "imageUrl": null,
+              "answerOptions": [
+                { "text": "工事作業で使用した台車を放置したまま退去した", "rationale": "過去の事故事例として、「工事作業で使用した台車を放置したまま退去し、工事エリアから約150m離れた場所で発見された」という重大な事例が記載されています。また、進入防止用のウエイトや標尺の置き忘れ事例も報告されています。", "isCorrect": true },
+                { "text": "休憩中に飲んだペットボトルを誘導路上に放置した", "rationale": "ペットボトルに関する具体的な記載はありませんが、台車の放置事例がマニュアルに記載されています。", "isCorrect": false },
+                { "text": "車両のスペアタイヤを現場に置き忘れた", "rationale": "スペアタイヤの記載はありません。", "isCorrect": false },
+                { "text": "スマートフォンを滑走路の端に落として退出した", "rationale": "スマートフォンの記載はありません。", "isCorrect": false }
+              ],
+              "hint": "FODに繋がる大きな機材の置き忘れが事例として挙げられています。"
+            },
+            {
+              "questionNumber": 3,
+              "question": "滑走路や誘導路上を通行する際、車両はどの位置を目安に走行することが定められていますか。",
+              "category": "車両運行・経路",
+              "imageUrl": null,
+              "answerOptions": [
+                { "text": "走りやすい場所を自由に走行してよい", "rationale": "走行位置には明確な規定があります。", "isCorrect": false },
+                { "text": "センターラインに沿って（センターラインから5m離隔をとって）走行する", "rationale": "滑走路・誘導路上ではセンターラインに沿って走行します。ただし、センターラインの埋設灯火などを保護するため、センターラインからは5m離隔をとって走行することがルールとなっています。", "isCorrect": true },
+                { "text": "常にショルダー部（端）の緑地帯寄りを走行する", "rationale": "端を走行する規定ではありません。", "isCorrect": false },
+                { "text": "センターラインの真上を跨ぐように走行する", "rationale": "センターラインの埋設灯火保護のため、真上は避ける必要があります。", "isCorrect": false }
+              ],
+              "hint": "埋設灯火などを保護するため、少し距離を空けて走行する必要があります。"
+            },
+            {
+              "questionNumber": 4,
+              "question": "工事車両用IDカード、個人IDカード、車両識別旗などを紛失してしまった場合、最初にとるべき行動はどれですか。",
+              "category": "緊急時対応・通報",
+              "imageUrl": null,
+              "answerOptions": [
+                { "text": "自分で1時間探してみて、見つからなければ報告する", "rationale": "探すことに時間をかける前に報告が必要です。", "isCorrect": false },
+                { "text": "翌日の朝礼時に元請職員に報告する", "rationale": "翌日では遅すぎます。空港運用に直結するため直ちに報告が必要です。", "isCorrect": false },
+                { "text": "直ちに元請職員に報告する", "rationale": "IDカードや識別旗等の紛失は空港運用に重大な支障をきたすため、紛失した際は直ちに元請職員に報告しなければなりません。その後、元請職員がCAB運航情報官等へ遺失届を提出します。", "isCorrect": true },
+                { "text": "直接、空港警察署に電話して遺失届を出す", "rationale": "まずは管理責任者である元請職員への報告が優先です。", "isCorrect": false }
+              ],
+              "hint": "セキュリティに関わる重大インシデントになり得るため、スピード報告が命です。"
+            },
+            {
+              "questionNumber": 5,
+              "question": "滑走路や誘導路上で車両をUターンさせる際のルールとして正しいものはどれですか。",
+              "category": "車両運行・経路",
+              "imageUrl": null,
+              "answerOptions": [
+                { "text": "ショルダー（端）側に向かってUターンする", "rationale": "ショルダー側へのUターンは禁止されています。", "isCorrect": false },
+                { "text": "センターライン方向（内側）に向かってUターンする", "rationale": "車両の誘導路上でのUターンは、必ずセンターライン側（内側）に行うことが定められています。また、大型車両は誘導員なしでのUターンは禁止されています。", "isCorrect": true },
+                { "text": "大型車両であっても、後方確認ができれば単独でUターンしてよい", "rationale": "大型車は誘導員なしでのUターンが禁止されています。", "isCorrect": false },
+                { "text": "誘導路上でのUターンは全面禁止されているため、バックで戻る", "rationale": "Uターン自体が全面禁止されているわけではなく、方向などに規定があります。", "isCorrect": false }
+              ],
+              "hint": "外側へはみ出す危険をなくすため、どちら向きに転回すべきかを考えましょう。"
+            },
+            {
+              "questionNumber": 6,
+              "question": "制限区域内を走行中、ルートを間違えたり現在地が分からなくなったりした場合の正しい対処法はどれですか。",
+              "category": "車両運行・経路",
+              "imageUrl": null,
+              "answerOptions": [
+                { "text": "記憶を頼りに、自力で元のルートを探す", "rationale": "自己判断で動くと誤進入などの事故につながります。", "isCorrect": false },
+                { "text": "後続車についていき、適当な場所でUターンする", "rationale": "後続車が正しいとも限らず、適当なUターンは危険です。", "isCorrect": false },
+                { "text": "その場で停車し、速やかにJV職員か1次下請業者に報告して指示を待つ", "rationale": "走行している場所が分からなくなった場合やルートを誤った場合は、絶対に自己判断で動かず、その場で停車して速やかにJV職員等に報告し、指示を待つ必要があります。", "isCorrect": true },
+                { "text": "管制塔に直接無線で連絡し、道案内を要請する", "rationale": "まずは現場の責任者（JV職員等）へ報告して指示を仰ぎます。", "isCorrect": false }
+              ],
+              "hint": "迷った時は「止まる」「連絡する」「指示を待つ」が鉄則です。"
+            },
+            {
+              "questionNumber": 7,
+              "question": "車両の乗降時のドアの開閉について、飛散防止などの観点から定められているルールはどれですか。",
+              "category": "火気・飛散防止",
+              "imageUrl": null,
+              "answerOptions": [
+                { "text": "左右のドアを同時に開けて、素早く乗り降りする", "rationale": "左右同時開閉は風が吹き抜けやすく、飛散のリスクが高まります。", "isCorrect": false },
+                { "text": "換気のため、走行中も少しだけドアを開けておく", "rationale": "走行中にドアを開けておくことは大変危険です。", "isCorrect": false },
+                { "text": "ドアの開閉は1箇所ずつ行い、一人ずつ乗り降りする", "rationale": "車内からの書類やゴミの飛散を防止するため、また安全確認のため、車両の乗り降りは一人ずつ行い、左右のドアの同時開放は禁止されています（ドアの開閉は一箇所ずつ行う）。", "isCorrect": true },
+                { "text": "風の強い日のみ、ドアを1箇所ずつ開ける", "rationale": "天候に関わらず、常に1箇所ずつ開閉するルールです。", "isCorrect": false }
+              ],
+              "hint": "車内に風が吹き抜けて物が飛ばされないようにするためのルールです。"
+            },
+            {
+              "questionNumber": 8,
+              "question": "過去の事故事例を踏まえ、保安道路や誘導路の出入口に設置されるようになった目印の組み合わせとして正しいものはどれですか。",
+              "category": "航空灯火・施設保護",
+              "imageUrl": null,
+              "answerOptions": [
+                { "text": "赤色カラーコーンのみ", "rationale": "カラーコーンだけでは不十分なため、対策が強化されました。", "isCorrect": false },
+                { "text": "緑色誘導棒付カラーコーン、矢印板（反射）、灯火養生表示", "rationale": "車両の誤進入や灯火損傷事故を防ぐため、出入口の標示は「緑色誘導棒付カラーコーン」とし、さらに「矢印板（反射）」と「灯火養生表示」を新たに設置して通行経路を明確にする対策が取られています。", "isCorrect": true },
+                { "text": "黄色の回転灯と進入禁止の看板", "rationale": "これは出入口の指定目印ではありません。", "isCorrect": false },
+                { "text": "青色のLEDライトとトラロープ", "rationale": "これは出入口の指定目印ではありません。", "isCorrect": false }
+              ],
+              "hint": "より視認性を高め、誤進入を明確に防ぐための3つのアイテムが指定されています。"
+            },
+            {
+              "questionNumber": 9,
+              "question": "トーイングルート（航空機の牽引ルート）を横断する際の、無線連絡等のルールとして正しいものはどれですか。",
+              "category": "無線交信・管制",
+              "imageUrl": null,
+              "answerOptions": [
+                { "text": "航空機が見えなければ、無線連絡なしでそのまま横断してよい", "rationale": "トーイングルートは必ず所定の連絡と確認が必要です。", "isCorrect": false },
+                { "text": "走行しながら運転手が携帯電話で管制塔に連絡する", "rationale": "走行中の運転手の携帯電話操作は危険です。", "isCorrect": false },
+                { "text": "車両停車位置（無線連絡位置）で必ず停車し、助手席の補助員等が現在地を確認しながら無線連絡を行う", "rationale": "トーイングルート（A6交差部など）での無断横断事故を防ぐため、車両停車位置（無線連絡位置）をマップ上にピン止めし、助手席の補助員が現在地位置を確認しながら連絡を行うなどのルールが徹底されています。", "isCorrect": true },
+                { "text": "後続車両がまとめて1回の無線連絡で全員横断する", "rationale": "それぞれが確実な確認を行う手順が求められます。", "isCorrect": false }
+              ],
+              "hint": "過去の無断横断によるトラブルを防ぐため、停車位置の厳守と確実な連絡体制が定められました。"
+            },
+            {
+              "questionNumber": 10,
+              "question": "現場作業終了時に行う、FOD（落下物・忘れ物）防止対策として正しい行動はどれですか。",
+              "category": "FOD・遺失物防止",
+              "imageUrl": null,
+              "answerOptions": [
+                { "text": "作業終了時、施工範囲において作業員が横一列に並び、一斉に歩いて忘れ物がないか確認する", "rationale": "FOD（落下物や忘れ物）は航空機事故に直結するため、作業終了時には施工範囲において作業員が「横一列に並び、忘れ物がないか一斉に歩き確認すること」がルールとして定められています。", "isCorrect": true },
+                { "text": "車両の窓から身を乗り出して、運転しながらサッと目視確認する", "rationale": "運転しながらの確認は不十分であり、歩行での確実な点検が必要です。", "isCorrect": false },
+                { "text": "現場監督1名だけが見回りを行い、他の作業員は先に退出する", "rationale": "作業員全員で横一列に並んで確認することが求められています。", "isCorrect": false },
+                { "text": "翌日の作業開始前に確認すればよいので、夜間はそのまま退出する", "rationale": "退出する前に確実に確認する必要があります。", "isCorrect": false }
+              ],
+              "hint": "複数の目で、見落としがないように現場全体をくまなくチェックする方法です。"
+            }
+          ]
+        };
+        
+        // 8分野に統合するためのマッピング
+        const CATEGORY_GROUPS = {
+            "ID・識別・資格": ["ID・車両識別管理"],
+            "航空機優先・接近": ["航空機優先・接近"],
+            "車両運行・一般ルール": ["車両運行・経路", "車両運行・速度", "夜間・健康管理"],
+            "サービスレーン・特定区域": ["サービスレーン・横断"],
+            "航空灯火・施設保護": ["航空灯火・施設保護"],
+            "FOD・環境・施設保護": ["FOD・遺失物防止", "油漏れ・飛散防止", "火気・飛散防止"],
+            "緊急時・通報": ["緊急時対応・通報"],
+            "管制・無線・一般禁止": ["無線交信・管制", "一般禁止事項"]
+        };
+        
+        let currentAnswers = {};
+        let isQuizCompleted = false;
+
+        function getCategoryGroup(category) {
+            for (const group in CATEGORY_GROUPS) {
+                if (CATEGORY_GROUPS[group].includes(category)) {
+                    return group;
+                }
+            }
+            return "その他";
+        }
+
+        function applyMarking(qIndex, aIndex) {
+            const q = quizData.questions[qIndex];
+            const qCard = document.getElementById(`question-${qIndex}`);
+            const isAnswered = qIndex in currentAnswers;
+            
+            qCard.querySelectorAll('input[type="radio"]').forEach((radio, optIndex) => {
+                const label = radio.parentElement;
+                const option = q.answerOptions[optIndex];
+
+                if (isAnswered) {
+                    radio.disabled = true;
+                    label.classList.add('answered');
+
+                    if (option.isCorrect) {
+                        label.classList.add('correct');
+                    } else if (aIndex === optIndex) {
+                        label.classList.add('incorrect');
+                    }
+                } else {
+                    radio.disabled = false;
+                    label.classList.remove('answered', 'correct', 'incorrect');
+                }
+            });
+        }
+
+        function initializeAnswers() {
+            quizData.questions.forEach((q, index) => {
+                const storedAnswer = localStorage.getItem(`q${index}`);
+                if (storedAnswer !== null) {
+                    const ansIndex = parseInt(storedAnswer);
+                    currentAnswers[index] = ansIndex;
+                    
+                    const radio = document.querySelector(`input[name="question-${index}"][value="${ansIndex}"]`);
+                    if (radio) {
+                        radio.checked = true;
+                    }
+                    
+                    applyMarking(index, ansIndex);
+                    showInstantFeedback(index, ansIndex, true); 
+                }
+            });
+            if (Object.keys(currentAnswers).length === quizData.questions.length) {
+                isQuizCompleted = true;
+            }
+        }
+        
+        function showInstantFeedback(qIndex, aIndex, isInitialization = false) {
+            const q = quizData.questions[qIndex];
+            const rationaleContainer = document.getElementById(`rationale-${qIndex}`);
+            let isCorrect = q.answerOptions[aIndex].isCorrect;
+
+            if (!isInitialization) {
+                applyMarking(qIndex, aIndex);
+            }
+
+            const correctOption = q.answerOptions.find(opt => opt.isCorrect);
+            rationaleContainer.style.display = 'block';
+            rationaleContainer.innerHTML = `
+                <div class="rationale ${isCorrect ? 'correct' : 'incorrect'}">
+                    <strong>${isCorrect ? '【正解】' : '【不正解】'}</strong><br>
+                    <strong>解説:</strong> ${correctOption.rationale}
+                </div>
+            `;
+            
+            if (Object.keys(currentAnswers).length === quizData.questions.length && !isQuizCompleted) {
+                 isQuizCompleted = true;
+                 updateSubmitButton();
+            }
+        }
+
+        function renderQuiz() {
+            const quizContent = document.getElementById('quiz-content');
+            quizContent.innerHTML = '';
+            quizData.questions.forEach((q, index) => {
+                const qCard = document.createElement('div');
+                qCard.className = 'question-card';
+                qCard.id = `question-${index}`;
+
+                const qText = document.createElement('div');
+                qText.className = 'question-text';
+                qText.innerHTML = `問${index + 1}. [${getCategoryGroup(q.category)}] ${q.question}`;
+                qCard.appendChild(qText);
+                
+                const hintText = document.createElement('div');
+                hintText.className = 'hint-text';
+                hintText.textContent = `ヒント: ${q.hint}`;
+                qCard.appendChild(hintText);
+
+                q.answerOptions.forEach((option, optIndex) => {
+                    const label = document.createElement('label');
+                    label.className = 'answer-option';
+                    
+                    const radio = document.createElement('input');
+                    radio.type = 'radio';
+                    radio.name = `question-${index}`;
+                    radio.value = optIndex;
+                    
+                    radio.onchange = (event) => {
+                        if (index in currentAnswers) {
+                            return;
+                        }
+                        handleAnswer(index, optIndex);
+                        showInstantFeedback(index, optIndex);
+                    };
+
+                    label.appendChild(radio);
+                    label.appendChild(document.createTextNode(option.text));
+                    qCard.appendChild(label);
+                });
+
+                const rationaleContainer = document.createElement('div');
+                rationaleContainer.id = `rationale-${index}`;
+                rationaleContainer.className = 'rationale-container';
+                rationaleContainer.style.display = 'none';
+                qCard.appendChild(rationaleContainer);
+
+                quizContent.appendChild(qCard);
+            });
+            
+            initializeAnswers();
+            updateSubmitButton();
+        }
+
+        function handleAnswer(qIndex, aIndex) {
+            currentAnswers[qIndex] = aIndex;
+            localStorage.setItem(`q${qIndex}`, aIndex);
+            updateSubmitButton();
+        }
+
+
+        function updateSubmitButton() {
+            const totalQuestions = quizData.questions.length;
+            const answeredCount = Object.keys(currentAnswers).length;
+            const submitButton = document.getElementById('show-results-btn');
+            
+            submitButton.textContent = `結果を表示 (${answeredCount}/${totalQuestions} 問解答)`;
+
+            if (answeredCount === totalQuestions) {
+                submitButton.disabled = false;
+            } else {
+                submitButton.disabled = true;
+            }
+        }
+
+
+        function calculateResults() {
+            const totalQuestions = quizData.questions.length;
+            let score = 0;
+            const results = [];
+            const categoryScores = {}; 
+
+            // 8分野すべてを初期化（問題数が0でもキーが存在するように）
+            for (const group in CATEGORY_GROUPS) {
+                categoryScores[group] = { correct: 0, total: 0 };
+            }
+
+            quizData.questions.forEach((q, index) => {
+                const selectedOptionIndex = currentAnswers[index];
+                const groupName = getCategoryGroup(q.category);
+                let isCorrect = false;
+
+                q.answerOptions.forEach((option, optIndex) => {
+                    if (option.isCorrect && selectedOptionIndex === optIndex) {
+                        score++;
+                        isCorrect = true;
+                    }
+                });
+
+                // 質問に対応するグループのみスコアを計算
+                if (groupName && groupName !== "その他") {
+                    categoryScores[groupName].total++;
+                    if (isCorrect) {
+                        categoryScores[groupName].correct++;
+                    }
+                }
+
+                results.push({
+                    question: q.question,
+                    isCorrect: isCorrect,
+                    userAnswerIndex: selectedOptionIndex,
+                    correctAnswerIndex: q.answerOptions.findIndex(opt => opt.isCorrect)
+                });
+            });
+
+            return { score, totalQuestions, results, categoryScores };
+        }
+        
+        // --- データ送信関数（Googleフォーム標準投稿） ---
+        function sendDataToForm(score, total, percentage, results, categoryScores) {
+            
+            // 🚨 投稿用 URLを構築します。
+            const FORM_KEY = "1FAIpQLSd-iNAZZD6jzSg5yp5v3Jfettls7nMSnpqhXZw91GDmxVZHgQ";
+            const FORM_POST_URL = `https://docs.google.com/forms/d/e/${FORM_KEY}/formResponse`;
+
+            // ✅ 取得した正確なフィールドIDを組み込みます
+            const ID_USER = 'entry.2125414563'; 
+            const ID_SCORE = 'entry.1918104257'; 
+            const ID_PERCENTAGE = 'entry.1237722946'; 
+            const ID_Q_ANSWERS = 'entry.840212971'; // Q Answers (設問ごと正誤文字列)
+            
+            // ユーザーID入力 (時刻で仮対応)
+            const USER_IDENTIFIER = "ユーザー_" + new Date().toLocaleTimeString('ja-JP'); 
+            
+            // Q1-Q10の正誤を「1」か「0」のカンマ区切り文字列で作成
+            const qAnswersString = results.map(res => res.isCorrect ? "1" : "0").join(','); 
+
+            // データペイロードの構築
+            const payload = new URLSearchParams();
+            payload.append(ID_USER, USER_IDENTIFIER);
+            payload.append(ID_SCORE, `${score}/${total}`);
+            payload.append(ID_PERCENTAGE, percentage + '%');
+            payload.append(ID_Q_ANSWERS, qAnswersString);
+
+            // 最終投稿URLを構築
+            const finalPostUrl = `${FORM_POST_URL}?${payload.toString()}`;
+
+            // ユーザーをリダイレクトし、データ送信を実行
+            window.location.href = finalPostUrl; 
+        }
+        
+        function generateRadarChart(scores) {
+            let chart = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
+            let radarText = "";
+            const maxNameLength = 16;
+            const chartScale = 30;
+
+            for (const group in scores) {
+                const data = scores[group];
+                if (group === "その他") continue;
+
+                const rate = data.total > 0 ? data.correct / data.total : 0;
+                const barLength = Math.round(rate * chartScale);
+                const bar = "■".repeat(barLength) + " ".repeat(chartScale - barLength);
+                const percentage = (rate * 100).toFixed(0);
+                
+                let colorClass = 'low';
+                if (rate >= 0.8) {
+                    colorClass = 'high';
+                } else if (rate >= 0.5) {
+                    colorClass = 'mid';
+                }
+
+                const paddedName = group.padEnd(maxNameLength, ' ');
+                radarText += `<span class="${colorClass}">${paddedName}: [${bar}] ${percentage}%</span>\n`;
+            }
+            chart += radarText;
+            chart += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
+            chart += "■: 正答率バー (50%未満:赤, 50-79%:黄, 80%以上:緑)\n";
+            return chart;
+        }
+
+
+        function showResults() {
+            const { score, totalQuestions, results, categoryScores } = calculateResults();
+            const percentage = (score / totalQuestions * 100).toFixed(1);
+            
+            // フォーム送信を実行
+            sendDataToForm(score, totalQuestions, percentage, results, categoryScores); 
+            
+            const resultsDiv = document.getElementById('results');
+            const radarChart = generateRadarChart(categoryScores);
+            resultsDiv.style.display = 'block';
+
+            let analysisHTML = `
+                <h2>分野別 正答率分析（8分野）</h2>
+                <p>※集計項目を簡素化しました。詳細な分野別分析はスプレッドシートの「Q Answers」列のデータを使って行ってください。</p>
+                <div class="analysis-detail">
+                    <pre class="radar-chart">${radarChart}</pre>
+                </div>
+                
+                <p style="margin-top: 20px;"><strong>不正解問題リスト（復習推奨）:</strong></p>
+                <ul style="text-align: left; margin-left: 20px;">
+                ${results.map((res, index) => 
+                    !res.isCorrect ? `<li style="color: #dc3545;">問${index + 1}. [${getCategoryGroup(quizData.questions[index].category)}] ${quizData.questions[index].question}</li>` : ''
+                ).join('')}
+                </ul>
+            `;
+            
+            resultsDiv.innerHTML = `
+                <h2>クイズ結果概要</h2>
+                <div class="score-info">
+                    ${totalQuestions}問中 ${score}問正解！
+                </div>
+                <p>正答率: ${percentage}%</p>
+                <button class="submit-btn" onclick="clearLocalStorageAndResetForm()">もう一度挑戦する</button>
+                ${analysisHTML}
+                <p style="margin-top: 20px;">集計データが記録された後、ブラウザの「戻る」ボタンでクイズに戻り、結果を確認できます。</p>
+            `;
+            document.getElementById('show-results-btn').style.display = 'none';
+        }
+
+        function clearLocalStorageAndResetForm() {
+            if (confirm("これまでの回答データを消去し、新しくクイズを開始しますか？")) {
+                quizData.questions.forEach((q, index) => {
+                    localStorage.removeItem(`q${index}`);
+                });
+                document.getElementById('quiz-form').reset();
+                location.reload();
+            }
+        }
+        
+        document.getElementById('show-results-btn').addEventListener('click', showResults);
+        
+        renderQuiz();
+    </script>
+</body>
+</html>
